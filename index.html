@@ -1,0 +1,966 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>She Loves Tutoring Invoice</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- html2pdf.js CDN for PDF export (includes html2canvas) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        /* Custom styles for printing and PDF export */
+        @media print {
+            body {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+            .no-print {
+                display: none !important;
+            }
+            /* Adjust input fields for printing - make them transparent */
+            .printable-input, .printable-textarea {
+                border: none !important;
+                background-color: transparent !important;
+                padding: 0 !important;
+                width: 100% !important; /* Ensure they take full width */
+                box-shadow: none !important;
+                outline: none !important;
+                resize: none !important;
+            }
+            /* Ensure the text content is visible for print */
+            .editable-text-wrapper > span {
+                 display: block !important; /* Show the span content */
+            }
+            .editable-text-wrapper > input, .editable-text-wrapper > textarea {
+                display: none !important; /* Hide inputs/textareas during print */
+            }
+
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #fce4ec; /* Light pink background */
+        }
+        /* Style for editable inputs to look like text by default */
+        .editable-text-wrapper input[type="text"],
+        .editable-text-wrapper input[type="date"],
+        .editable-text-wrapper textarea {
+            background-color: #fff0f5; /* Very light pink */
+            border: 1px solid #ffccd8; /* Muted pink border */
+            padding: 4px 8px;
+            border-radius: 6px;
+            width: 100%;
+            display: none; /* Hidden by default, shown on edit */
+        }
+        .editable-text-wrapper input[type="text"]:focus,
+        .editable-text-wrapper input[type="date"]:focus,
+        .editable-text-wrapper textarea:focus {
+            outline: none;
+            border-color: #f06292; /* Brighter pink on focus */
+            box-shadow: 0 0 0 1px #f06292;
+        }
+        .editable-text-wrapper span {
+            display: block; /* Show by default, hidden on edit */
+            cursor: pointer;
+            padding: 4px 0; /* Add some padding for clickable area */
+        }
+        .editable-text-wrapper.editing span {
+            display: none;
+        }
+        .editable-text-wrapper.editing input,
+        .editable-text-wrapper.editing textarea {
+            display: block;
+        }
+
+
+        /* Make table cell inputs match table text style */
+        #invoiceItems input {
+            background-color: transparent;
+            border: 1px solid transparent; /* default to transparent */
+            padding: 0;
+            width: 100%;
+            text-align: inherit; /* Inherit text alignment from parent td */
+            border-radius: 0; /* Remove rounded corners for table inputs */
+        }
+        #invoiceItems input:focus {
+            background-color: #ffebee; /* Lighter pink on focus for table cells */
+            border-bottom: 1px solid #f06292;
+            border-radius: 0;
+            box-shadow: none;
+        }
+
+        /* Styling for the invoice content based on controls */
+        .invoice-container.bold-text * { font-weight: bold !important; }
+        .invoice-container.capitalize-text * { text-transform: capitalize !important; }
+        .invoice-container.underline-text * { text-decoration: underline !important; }
+
+        /* Font size classes - apply to invoice-container */
+        .invoice-container.text-sm-invoice * { font-size: 0.875rem !important; } /* sm */
+        .invoice-container.text-base-invoice * { font-size: 1rem !important; } /* base */
+        .invoice-container.text-lg-invoice * { font-size: 1.125rem !important; } /* lg */
+        .invoice-container.text-xl-invoice * { font-size: 1.25rem !important; } /* xl */
+
+        /* Specific overrides for heading sizes within font-size classes */
+        .invoice-container.text-sm-invoice h1 { font-size: 2.25rem !important; } /* h1 sm */
+        .invoice-container.text-base-invoice h1 { font-size: 3rem !important; } /* h1 base */
+        .invoice-container.text-lg-invoice h1 { font-size: 3.5rem !important; } /* h1 lg */
+        .invoice-container.text-xl-invoice h1 { font-size: 4rem !important; } /* h1 xl */
+
+        .invoice-container.text-sm-invoice h2 { font-size: 1.5rem !important; }
+        .invoice-container.text-base-invoice h2 { font-size: 2rem !important; }
+        .invoice-container.text-lg-invoice h2 { font-size: 2.25rem !important; }
+        .invoice-container.text-xl-invoice h2 { font-size: 2.5rem !important; }
+
+        .invoice-container.text-sm-invoice h3 { font-size: 1.125rem !important; }
+        .invoice-container.text-base-invoice h3 { font-size: 1.25rem !important; }
+        .invoice-container.text-lg-invoice h3 { font-size: 1.375rem !important; }
+        .invoice-container.text-xl-invoice h3 { font-size: 1.5rem !important; }
+
+        /* Loading spinner */
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #d81b60; /* Pink spinner */
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 2s linear infinite;
+            display: inline-block;
+            vertical-align: middle;
+            margin-left: 8px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Modal Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .modal-content {
+            background-color: #fff;
+            padding: 2rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
+            width: 90%;
+            max-width: 500px;
+            position: relative;
+            overflow-y: auto; /* Enable vertical scrolling for content */
+            max-height: 90vh; /* Limit height to viewport height */
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #f8bbd0; /* Muted pink border */
+            padding-bottom: 1rem;
+            margin-bottom: 1.5rem;
+            position: sticky; /* Keep header visible on scroll */
+            top: 0;
+            background-color: inherit; /* Inherit background to blend */
+            z-index: 10; /* Ensure it stays on top of scrolling content */
+        }
+        .modal-close-btn {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #ec407a; /* Pink close button */
+            position: absolute; /* Position absolutely within the modal-content */
+            top: 1rem;
+            right: 1rem;
+            width: 2rem; /* Ensure clickable area */
+            height: 2rem; /* Ensure clickable area */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 50%; /* Make it round */
+            transition: background-color 0.2s ease;
+        }
+        .modal-close-btn:hover {
+            background-color: #fce4ec; /* Light pink hover */
+        }
+
+        .modal-input-group {
+            margin-bottom: 1rem;
+        }
+        .modal-input-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: #d81b60; /* Darker pink for labels */
+        }
+        .modal-input-group input[type="text"],
+        .modal-input-group input[type="date"],
+        .modal-input-group input[type="number"],
+        .modal-input-group textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #f8bbd0; /* Muted pink border */
+            border-radius: 0.5rem;
+            font-size: 1rem;
+        }
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 1rem;
+            margin-top: 1.5rem;
+            position: sticky; /* Keep actions visible on scroll */
+            bottom: 0;
+            background-color: inherit; /* Inherit background to blend */
+            padding-top: 1rem; /* Add padding to separate from content */
+            border-top: 1px solid #f8bbd0; /* Add a border to separate from content */
+            z-index: 10; /* Ensure it stays on top of scrolling content */
+        }
+
+        /* Draggable styling panel */
+        /* This entire block is kept but hidden/inactive as per previous request */
+        #stylingPanel {
+            position: fixed;
+            background-color: #ec407a; /* Pink background for panel */
+            padding: 1rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.25);
+            z-index: 999;
+            cursor: grab;
+            max-width: 280px;
+            transition: all 0.2s ease-in-out;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: none; /* HIDDEN */
+        }
+        #stylingPanel.dragging {
+            cursor: grabbing;
+        }
+        .styling-panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid #f8bbd0;
+            cursor: grab;
+        }
+        .styling-panel-header h4 {
+            color: #fff;
+            font-weight: bold;
+            font-size: 1.125rem;
+        }
+        .styling-close-btn {
+            background: none;
+            border: none;
+            color: #fff;
+            font-size: 1.25rem;
+            cursor: pointer;
+        }
+
+        /* Context Menu styles */
+        .context-menu {
+            position: fixed;
+            background-color: #d81b60; /* Darker pink */
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            z-index: 1001;
+            display: none;
+            overflow: hidden;
+        }
+        .context-menu button {
+            display: block;
+            width: 100%;
+            padding: 0.75rem 1rem;
+            text-align: left;
+            color: #fff;
+            background: none;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+        .context-menu button:hover {
+            background-color: #e91e63; /* Even darker pink on hover */
+        }
+        .context-menu button:first-child {
+            border-top-left-radius: 0.5rem;
+            border-top-right-radius: 0.5rem;
+        }
+        .context-menu button:last-child {
+            border-bottom-left-radius: 0.5rem;
+            border-bottom-right-radius: 0.5rem;
+        }
+    </style>
+</head>
+<body class="p-4 sm:p-6 md:p-8 lg:p-12 bg-gray-100 flex justify-center items-start min-h-screen">
+
+    <div id="invoiceContent" class="invoice-container bg-white rounded-lg shadow-xl p-6 sm:p-8 md:p-10 lg:p-12 w-full max-w-4xl border border-gray-200 transition-colors duration-200">
+
+        <!-- Header Section -->
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 pb-4 border-b-2 border-gray-300">
+            <div>
+                <h1 class="text-3xl sm:text-4xl font-extrabold text-pink-800 mb-2">INVOICE</h1>
+                <p class="text-gray-600 text-sm sm:text-base">Invoice #<span id="invoiceNumberWrapper" class="editable-text-wrapper font-semibold text-gray-800"><span data-field="invoiceNumber" class="printable-input">INV-2025-001</span></span></p>
+                <p class="text-gray-600 text-sm sm:text-base">Date: <span id="invoiceDateWrapper" class="editable-text-wrapper font-semibold text-gray-800"><span data-field="invoiceDate" class="printable-input"></span></span></p>
+            </div>
+            <div class="text-right mt-4 sm:mt-0">
+                <p class="text-2xl sm:text-3xl font-bold text-gray-800 editable-text-wrapper" id="tutorNameWrapper"><span data-field="tutorName" class="printable-input">She Loves Tutoring</span></p>
+                <p class="text-gray-600 text-sm sm:text-base editable-text-wrapper" id="tutorAddressWrapper"><span data-field="tutorAddress" class="printable-textarea">123 Blossom Lane, Knowledge City, 0001</span></p>
+                <p class="text-gray-600 text-sm sm:text-base editable-text-wrapper" id="tutorEmailWrapper"><span data-field="tutorEmail" class="printable-input">tutor@shelovestutoring.com</span></p>
+                <p class="text-gray-600 text-sm sm:text-base editable-text-wrapper" id="tutorPhoneWrapper"><span data-field="tutorPhone" class="printable-input">+27 12 345 6789</span></p>
+            </div>
+        </div>
+
+        <!-- Bill To Section -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
+            <div>
+                <h3 class="text-xl font-bold text-gray-800 mb-3 border-b border-gray-300 pb-1">BILL TO:</h3>
+                <p class="text-gray-700 font-semibold mb-1 editable-text-wrapper" id="clientNameWrapper"><span data-field="clientName" class="printable-input">Client Name</span></p>
+                <p class="text-gray-600 editable-text-wrapper" id="clientAddressWrapper"><span data-field="clientAddress" class="printable-textarea">Client Address Line 1<br>Client Address Line 2</span></p>
+                <p class="text-gray-600 editable-text-wrapper" id="clientEmailWrapper"><span data-field="clientEmail" class="printable-input">client@example.com</span></p>
+            </div>
+        </div>
+
+        <!-- Services Table -->
+        <div class="mb-6 overflow-x-auto rounded-lg border border-gray-200">
+            <table class="min-w-full bg-white">
+                <thead class="bg-pink-600 text-white rounded-t-lg">
+                    <tr>
+                        <th class="py-3 px-4 text-left text-sm font-semibold uppercase rounded-tl-lg">Date</th>
+                        <th class="py-3 px-4 text-left text-sm font-semibold uppercase">Subject</th>
+                        <th class="py-3 px-4 text-left text-sm font-semibold uppercase">Description</th>
+                        <th class="py-3 px-4 text-left text-sm font-semibold uppercase">Duration (Hours)</th>
+                        <th class="py-3 px-4 text-left text-sm font-semibold uppercase">Rate (R/Hour)</th>
+                        <th class="py-3 px-4 text-right text-sm font-semibold uppercase">Amount (R)</th>
+                        <th class="py-3 px-4 text-center text-sm font-semibold uppercase rounded-tr-lg no-print">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="invoiceItems" class="text-gray-800">
+                    <!-- Invoice items will be dynamically loaded here with editable inputs -->
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Add Item Button -->
+        <div class="flex justify-start mb-8 no-print">
+            <button id="showAddItemModalBtn" class="bg-pink-500 hover:bg-pink-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 no-print">
+                + Add Item
+            </button>
+        </div>
+
+        <!-- Total Section -->
+        <div class="flex justify-end mb-8">
+            <div class="w-full sm:w-1/2 lg:w-1/3 p-4 bg-pink-50 rounded-lg shadow-inner border border-pink-200">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-gray-700 text-lg font-semibold">Subtotal:</span>
+                    <span class="text-gray-900 text-lg font-bold">R<span id="subtotalAmount">0.00</span></span>
+                </div>
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-gray-700 text-lg font-semibold">Discount:</span>
+                    <span class="text-gray-900 text-lg font-bold">R<span id="discountAmountWrapper" class="editable-text-wrapper inline-block w-24 text-right"><span data-field="discountAmount" class="printable-input">0.00</span></span></span>
+                </div>
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-gray-700 text-lg font-semibold">Tax (0%):</span>
+                    <span class="text-gray-900 text-lg font-bold">R<span id="taxAmount">0.00</span></span>
+                </div>
+                <div class="flex justify-between items-center pt-2 border-t border-pink-300">
+                    <span class="text-pink-800 text-xl font-bold">TOTAL DUE:</span>
+                    <span class="text-pink-800 text-2xl font-extrabold">R<span id="totalAmount">0.00</span></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Payment Instructions -->
+        <div class="mb-10 p-6 bg-pink-50 rounded-lg border border-pink-200 shadow-sm">
+            <h3 class="text-xl font-bold text-gray-800 mb-3 border-b border-gray-300 pb-1">PAYMENT INSTRUCTIONS:</h3>
+            <p class="text-gray-700 mb-2">Please make payment to the following account:</p>
+            <p class="text-gray-700"><span class="font-semibold">Bank Name:</span> <span id="bankNameWrapper" class="editable-text-wrapper inline-block w-48"><span data-field="bankName" class="printable-input">Example Bank</span></span></p>
+            <p class="text-gray-700"><span class="font-semibold">Account Name:</span> <span id="accountNameWrapper" class="editable-text-wrapper inline-block w-48"><span data-field="accountName" class="printable-input">She Loves Tutoring</span></span></p>
+            <p class="text-gray-700"><span class="font-semibold">Account Number:</span> <span id="accountNumberWrapper" class="editable-text-wrapper inline-block w-48"><span data-field="accountNumber" class="printable-input">1234567890</span></span></p>
+            <p class="text-gray-700"><span class="font-semibold">Branch Code:</span> <span id="branchCodeWrapper" class="editable-text-wrapper inline-block w-48"><span data-field="branchCode" class="printable-input">001122</span></span></p>
+            <p class="text-gray-700 mt-4 text-sm italic editable-text-wrapper" id="footerNoteWrapper"><span data-field="footerNote" class="printable-input">Thank you for helping minds blossom and grow!</span></p>
+        </div>
+
+        <!-- Footer Notes -->
+        <div class="text-center text-gray-500 text-sm mt-8">
+            <p>Copyright © 2025 All Rights Reserved by She Loves Tutoring.</p>
+        </div>
+
+    </div>
+
+    <!-- Add Item Modal -->
+    <div id="addItemModal" class="modal-overlay hidden no-print">
+        <div class="modal-content rounded-xl">
+            <div class="modal-header">
+                <h3 class="text-2xl font-bold text-pink-700">Add New Invoice Item</h3>
+                <!-- Close button for the modal -->
+                <button class="modal-close-btn" onclick="toggleModal('addItemModal', false)">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="modal-input-group">
+                    <label for="modalDate">Date:</label>
+                    <input type="date" id="modalDate" value="" required>
+                </div>
+                <div class="modal-input-group">
+                    <label for="modalSubject">Subject:</label>
+                    <input type="text" id="modalSubject" placeholder="e.g., Mathematics, Physics" required>
+                </div>
+                <div class="modal-input-group flex items-center">
+                    <div class="flex-grow">
+                        <label for="modalDescription">Description:</label>
+                        <textarea id="modalDescription" rows="2" placeholder="e.g., Grade 10 Algebra Session, Newton's Laws Review"></textarea>
+                    </div>
+                </div>
+                <div class="modal-input-group">
+                    <label for="modalDuration">Duration (Hours):</label>
+                    <input type="number" id="modalDuration" value="1" min="0.5" step="0.5" required>
+                </div>
+                <div class="modal-input-group">
+                    <label for="modalRate">Rate (R/Hour):</label>
+                    <input type="number" id="modalRate" value="400.00" min="0" step="1" required>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-lg transition duration-300 ease-in-out" onclick="toggleModal('addItemModal', false)">Cancel</button>
+                <!-- Confirm button for adding item -->
+                <button id="addItemConfirmBtn" class="bg-pink-600 hover:bg-pink-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105">Add Item</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Styling Options Panel (HIDDEN AS PER REQUEST) -->
+    <div id="stylingPanel" class="no-print hidden rounded-xl">
+        <div class="styling-panel-header">
+            <h4>Styling Options</h4>
+            <button class="styling-close-btn" onclick="toggleStylingPanel(false)">&times;</button>
+        </div>
+        <div class="flex items-center mb-2">
+            <label for="backgroundColor" class="text-white text-sm mr-2 w-24">Background:</label>
+            <input type="color" id="backgroundColor" value="#ffffff" class="w-10 h-10 rounded-md cursor-pointer border-none" oninput="applyStyles(); saveInvoiceDataToLocalStorage();">
+        </div>
+        <div class="flex items-center mb-2">
+            <label for="textColor" class="text-white text-sm mr-2 w-24">Text Color:</label>
+            <input type="color" id="textColor" value="#1f2937" class="w-10 h-10 rounded-md cursor-pointer border-none" oninput="applyStyles(); saveInvoiceDataToLocalStorage();">
+        </div>
+
+        <div class="flex items-center mb-2">
+            <label for="fontSize" class="text-white text-sm mr-2 w-24">Font Size:</label>
+            <select id="fontSize" class="w-full p-2 rounded-md bg-gray-700 text-white border border-gray-600" onchange="applyStyles(); saveInvoiceDataToLocalStorage();">
+                <option value="base-invoice">Normal</option>
+                <option value="sm-invoice">Small</option>
+                <option value="lg-invoice">Large</option>
+                <option value="xl-invoice">Extra Large</option>
+            </select>
+        </div>
+
+        <div class="flex flex-col mb-4">
+            <label class="inline-flex items-center text-white mb-1">
+                <input type="checkbox" id="boldText" class="form-checkbox h-5 w-5 text-pink-600 rounded-md" onchange="applyStyles(); saveInvoiceDataToLocalStorage();">
+                <span class="ml-2 text-sm">Bold</span>
+            </label>
+            <label class="inline-flex items-center text-white mb-1">
+                <input type="checkbox" id="capitalizeText" class="form-checkbox h-5 w-5 text-pink-600 rounded-md" onchange="applyStyles(); saveInvoiceDataToLocalStorage();">
+                <span class="ml-2 text-sm">Capitalize</span>
+            </label>
+            <label class="inline-flex items-center text-white">
+                <input type="checkbox" id="underlineText" class="form-checkbox h-5 w-5 text-pink-600 rounded-md" onchange="applyStyles(); saveInvoiceDataToLocalStorage();">
+                <span class="ml-2 text-sm">Underline</span>
+            </label>
+        </div>
+    </div>
+
+    <!-- Context Menu Popup -->
+    <div id="contextMenu" class="context-menu no-print rounded-lg">
+        <button id="contextEditBtn" class="hover:bg-pink-700">Edit</button>
+        <button id="contextCopyBtn" class="hover:bg-pink-700">Copy</button>
+    </div>
+
+    <!-- Fixed Buttons (Export PDF, Styling Panel Toggle) -->
+    <div class="fixed bottom-4 right-4 flex flex-col gap-2 no-print">
+        <!-- Styling Options button is permanently removed -->
+        <button id="exportPdfBtn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-full shadow-lg transition duration-300 ease-in-out transform hover:scale-105 flex items-center justify-center">
+            <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M5.5 8V4.5A2.5 2.5 0 018 2h4A2.5 2.5 0 0114.5 4.5V8h2.5A.5.5 0 0117.5 9v.5a.5.5 0 01-.5.5H16v2h1a.5.5 0 01.5.5v.5a.5.5 0 01-.5.5H16v2h1a.5.5 0 01.5.5v.5a.5.5 0 01-.5.5H16v1.5a.5.5 0 01-.5.5H4.5A.5.5 0 014 17.5V16h-1a.5.5 0 01-.5-.5v-.5a.5.5 0 01.5-.5h1v-2h-1a.5.5 0 01-.5-.5v-.5a.5.5 0 01.5-.5h1v-2h-1a.5.5 0 01-.5-.5v-.5a.5.5 0 01.5-.5H4.5V8H5.5zM9 11a1 1 0 100 2h2a1 1 0 100-2H9z" clip-rule="evenodd"></path></svg>
+            Export PDF
+        </button>
+    </div>
+
+
+    <script>
+        // Data model for the invoice
+        let invoiceData = {
+            invoiceNumber: 'INV-2025-001',
+            invoiceDate: new Date().toISOString().slice(0, 10),
+            tutorName: 'She Loves Tutoring',
+            tutorAddress: '123 Blossom Lane, Knowledge City, 0001',
+            tutorEmail: 'tutor@shelovestutoring.com',
+            tutorPhone: '+27 12 345 6789',
+            clientName: 'Client Name',
+            clientAddress: 'Client Address Line 1\nClient Address Line 2',
+            clientEmail: 'client@example.com',
+            discountAmount: 0.00,
+            bankName: 'Example Bank',
+            accountName: 'She Loves Tutoring',
+            accountNumber: '1234567890',
+            branchCode: '001122',
+            footerNote: 'Thank you for helping minds blossom and grow!',
+            items: [
+                { date: new Date().toISOString().slice(0, 10), subject: 'Mathematics', description: 'Grade 10 Algebra Session', duration: 1, rate: 400 },
+                { date: new Date().toISOString().slice(0, 10), subject: 'Physics', description: 'Newton\'s Laws Review', duration: 1, rate: 400 },
+                { date: new Date().toISOString().slice(0, 10), subject: 'Chemistry', description: 'Balancing Chemical Equations', duration: 1, rate: 400 }
+            ],
+            styles: {
+                backgroundColor: '#ffffff',
+                textColor: '#1f2937',
+                fontSize: 'base-invoice',
+                boldText: false,
+                capitalizeText: false,
+                underlineText: false
+            }
+        };
+
+        // Current element being edited via context menu
+        let currentEditableElement = null;
+        let currentInputField = null; // The input field dynamically created for editing
+
+        // Function to format currency to two decimal places
+        function formatCurrency(amount) {
+            let num = parseFloat(amount);
+            return isNaN(num) ? '0.00' : num.toFixed(2);
+        }
+
+        // Function to calculate and update totals
+        function updateTotals() {
+            let subtotal = 0;
+            invoiceData.items.forEach(item => {
+                const amount = item.duration * item.rate;
+                subtotal += amount;
+            });
+
+            const discount = invoiceData.discountAmount;
+            const tax = 0; // 0% tax for tutoring services
+
+            const total = subtotal - discount + tax;
+
+            document.getElementById('subtotalAmount').textContent = formatCurrency(subtotal);
+            document.getElementById('discountAmountWrapper').querySelector('span').textContent = formatCurrency(discount);
+            document.getElementById('taxAmount').textContent = formatCurrency(tax);
+            document.getElementById('totalAmount').textContent = formatCurrency(total);
+
+            renderInvoiceItems(); // Re-render items to update any display changes
+            saveInvoiceDataToLocalStorage(); // Save data after updating totals
+        }
+
+        // Function to render invoice items from the data model (with editable inputs)
+        function renderInvoiceItems() {
+            const itemsTableBody = document.getElementById('invoiceItems');
+            itemsTableBody.innerHTML = ''; // Clear existing rows
+
+            invoiceData.items.forEach((item, index) => {
+                const newRow = itemsTableBody.insertRow();
+                newRow.className = "border-b border-gray-200 hover:bg-gray-50";
+
+                const amount = item.duration * item.rate;
+
+                newRow.innerHTML = `
+                    <td class="py-3 px-4"><input type="date" name="date" value="${item.date}" onchange="updateItemField(${index}, 'date', this.value);"></td>
+                    <td class="py-3 px-4"><input type="text" name="subject" value="${item.subject}" oninput="updateItemField(${index}, 'subject', this.value)"></td>
+                    <td class="py-3 px-4 flex items-center">
+                        <input type="text" name="description" value="${item.description}" class="flex-grow mr-2" oninput="updateItemField(${index}, 'description', this.value)">
+                    </td>
+                    <td class="py-3 px-4 text-center"><input type="number" name="duration" value="${item.duration}" min="0.5" step="0.5" class="text-center" oninput="updateItemField(${index}, 'duration', this.value); updateTotals();"></td>
+                    <td class="py-3 px-4 text-center">R<input type="number" name="rate" value="${item.rate}" min="0" step="1" class="text-center" oninput="updateItemField(${index}, 'rate', this.value); updateTotals();"></td>
+                    <td class="py-3 px-4 text-right"><span>${formatCurrency(amount)}</span></td>
+                    <td class="py-3 px-4 text-center no-print">
+                        <button onclick="removeItem(${index})" class="bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-2 rounded-md transition duration-300 ease-in-out transform hover:scale-105 text-sm">
+                            Remove
+                        </button>
+                    </td>
+                `;
+            });
+        }
+
+        // Update individual item field in invoiceData model
+        function updateItemField(index, field, value) {
+            if (field === 'duration' || field === 'rate') {
+                invoiceData.items[index][field] = parseFloat(value);
+            } else {
+                invoiceData.items[index][field] = value;
+            }
+            saveInvoiceDataToLocalStorage();
+        }
+
+        // Function to remove an invoice item
+        function removeItem(index) {
+            invoiceData.items.splice(index, 1);
+            updateTotals(); // This will re-render items and save
+        }
+
+
+        // Function to suggest description using Gemini API (for modal) - Kept in code, but no longer directly callable from UI
+        async function suggestDescriptionModal() {
+            const subjectInput = document.getElementById('modalSubject');
+            const descriptionInput = document.getElementById('modalDescription');
+            // Suggest button reference removed here as well, if it was needed for styling
+            // const suggestButton = document.querySelector('#addItemModal .bg-yellow-500');
+
+            // const originalButtonContent = suggestButton.innerHTML;
+            // suggestButton.innerHTML = '<div class="loader"></div>'; // Show loading spinner
+            // suggestButton.disabled = true;
+
+            const subject = subjectInput.value;
+            if (!subject) {
+                descriptionInput.value = "Please enter a subject first.";
+                // suggestButton.innerHTML = originalButtonContent;
+                // suggestButton.disabled = false;
+                return;
+            }
+
+            const prompt = `Generate a detailed and professional one-sentence description for a private tutoring session on the subject: "${subject}". Focus on the key learning outcomes or topics covered. Make it concise and suitable for an invoice.`;
+
+            let chatHistory = [];
+            chatHistory.push({ role: "user", parts: [{ text: prompt }] });
+            const payload = { contents: chatHistory };
+            const apiKey = ""; // If you want to use models other than gemini-2.0-flash or imagen-3.0-generate-002, provide an API key here. Otherwise, leave this as-is.
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const result = await response.json();
+
+                if (result.candidates && result.candidates.length > 0 &&
+                    result.candidates[0].content && result.candidates[0].content.parts &&
+                    result.candidates[0].content.parts.length > 0) {
+                    const text = result.candidates[0].content.parts[0].text;
+                    descriptionInput.value = text.trim();
+                } else {
+                    descriptionInput.value = "Failed to generate description. Please try again.";
+                }
+            } catch (error) {
+                console.error("Error generating description:", error);
+                descriptionInput.value = "Error generating description. Check console for details.";
+            } finally {
+                // suggestButton.innerHTML = originalButtonContent; // Restore button text
+                // suggestButton.disabled = false;
+            }
+        }
+
+        // Function to suggest description directly on an item row - Removed functionality
+        async function suggestDescriptionItem(button, index) {
+            // Functionality removed as per request. This function will no longer be called.
+            console.log("Suggest Description functionality has been removed.");
+        }
+
+
+        // Function to apply styling based on user controls
+        function applyStyles() {
+            const invoiceContent = document.getElementById('invoiceContent');
+            const styles = invoiceData.styles;
+
+            // Apply background and text color to the main container
+            invoiceContent.style.backgroundColor = styles.backgroundColor;
+            invoiceContent.style.color = styles.textColor;
+
+            // Remove existing font size classes
+            invoiceContent.classList.remove('text-sm-invoice', 'text-base-invoice', 'text-lg-invoice', 'text-xl-invoice');
+            // Add selected font size class
+            invoiceContent.classList.add(styles.fontSize);
+
+            // Toggle bold, capitalize, underline classes
+            invoiceContent.classList.toggle('bold-text', styles.boldText);
+            invoiceContent.classList.toggle('capitalize-text', styles.capitalizeText);
+            invoiceContent.classList.toggle('underline-text', styles.underlineText);
+        }
+
+        // Function to save all invoice data and styling to localStorage
+        function saveInvoiceDataToLocalStorage() {
+            localStorage.setItem('tutoringInvoice', JSON.stringify(invoiceData));
+        }
+
+        // Function to load invoice data and styling from localStorage
+        function loadInvoiceDataFromLocalStorage() {
+            const savedData = localStorage.getItem('tutoringInvoice');
+            if (savedData) {
+                invoiceData = JSON.parse(savedData);
+            } else {
+                // Initialize with defaults if no data in localStorage
+                // Defaults are already set in the global invoiceData object, so no need to re-assign here.
+            }
+
+            // Populate static display elements from invoiceData model
+            document.getElementById('invoiceNumberWrapper').querySelector('span').textContent = invoiceData.invoiceNumber;
+            document.getElementById('invoiceDateWrapper').querySelector('span').textContent = new Date(invoiceData.invoiceDate).toLocaleDateString('en-ZA', { year: 'numeric', month: 'long', day: 'numeric' });
+            document.getElementById('tutorNameWrapper').querySelector('span').textContent = invoiceData.tutorName;
+            document.getElementById('tutorAddressWrapper').querySelector('span').innerHTML = invoiceData.tutorAddress.replace(/\n/g, '<br>');
+            document.getElementById('tutorEmailWrapper').querySelector('span').textContent = invoiceData.tutorEmail;
+            document.getElementById('tutorPhoneWrapper').querySelector('span').textContent = invoiceData.tutorPhone;
+            document.getElementById('clientNameWrapper').querySelector('span').textContent = invoiceData.clientName;
+            document.getElementById('clientAddressWrapper').querySelector('span').innerHTML = invoiceData.clientAddress.replace(/\n/g, '<br>');
+            document.getElementById('clientEmailWrapper').querySelector('span').textContent = invoiceData.clientEmail;
+            document.getElementById('discountAmountWrapper').querySelector('span').textContent = formatCurrency(invoiceData.discountAmount);
+            document.getElementById('bankNameWrapper').querySelector('span').textContent = invoiceData.bankName;
+            document.getElementById('accountNameWrapper').querySelector('span').textContent = invoiceData.accountName;
+            document.getElementById('accountNumberWrapper').querySelector('span').textContent = invoiceData.accountNumber;
+            document.getElementById('branchCodeWrapper').querySelector('span').textContent = invoiceData.branchCode;
+            document.getElementById('footerNoteWrapper').querySelector('span').textContent = invoiceData.footerNote;
+
+            // Set styling control values
+            document.getElementById('backgroundColor').value = invoiceData.styles.backgroundColor;
+            document.getElementById('textColor').value = invoiceData.styles.textColor;
+            document.getElementById('fontSize').value = invoiceData.styles.fontSize;
+            document.getElementById('boldText').checked = invoiceData.styles.boldText;
+            document.getElementById('capitalizeText').checked = invoiceData.styles.capitalizeText;
+            document.getElementById('underlineText').checked = invoiceData.styles.underlineText;
+
+            applyStyles(); // Apply loaded styles
+            renderInvoiceItems(); // Render initial static items (now with inputs)
+            updateTotals(); // Calculate totals based on loaded data
+        }
+
+
+        // Modal Toggle Function
+        function toggleModal(modalId, show) {
+            const modal = document.getElementById(modalId);
+            if (show) {
+                modal.classList.remove('hidden');
+                // Set default date for new item modal
+                document.getElementById('modalDate').value = new Date().toISOString().slice(0, 10);
+                document.getElementById('modalSubject').value = 'Subject';
+                document.getElementById('modalDescription').value = 'Session Description';
+                document.getElementById('modalDuration').value = '1';
+                document.getElementById('modalRate').value = '400';
+            } else {
+                modal.classList.add('hidden');
+            }
+        }
+
+        // Draggable Styling Panel Logic (Still present but hidden, and not actively used with button removed)
+        let stylingPanel = document.getElementById('stylingPanel');
+        let isDragging = false;
+        let offsetX, offsetY;
+
+        // Attaching mousedown listener to the header to allow dragging of the panel itself
+        if (stylingPanel && stylingPanel.querySelector('.styling-panel-header')) {
+            stylingPanel.querySelector('.styling-panel-header').addEventListener('mousedown', (e) => {
+                isDragging = true;
+                offsetX = e.clientX - stylingPanel.getBoundingClientRect().left;
+                offsetY = e.clientY - stylingPanel.getBoundingClientRect().top;
+                stylingPanel.classList.add('dragging');
+            });
+        }
+
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            let newLeft = e.clientX - offsetX;
+            let newTop = e.clientY - offsetY;
+
+            newLeft = Math.max(0, Math.min(newLeft, window.innerWidth - stylingPanel.offsetWidth));
+            newTop = Math.max(0, Math.min(newTop, window.innerHeight - stylingPanel.offsetHeight));
+
+            stylingPanel.style.left = newLeft + 'px';
+            stylingPanel.style.top = newTop + 'px';
+            stylingPanel.style.transform = 'none';
+        });
+
+        document.addEventListener('mouseup', () => {
+            isDragging = false;
+            stylingPanel.classList.remove('dragging');
+        });
+
+        // Toggle Styling Panel Visibility (Not called from UI directly anymore)
+        function toggleStylingPanel(show) {
+            if (stylingPanel) { // Ensure panel exists before trying to show/hide
+                if (show) {
+                    stylingPanel.classList.remove('hidden');
+                } else {
+                    stylingPanel.classList.add('hidden');
+                }
+            }
+        }
+
+        // Context Menu Logic
+        const contextMenu = document.getElementById('contextMenu');
+        const contextEditBtn = document.getElementById('contextEditBtn');
+        const contextCopyBtn = document.getElementById('contextCopyBtn');
+
+        function showContextMenu(e, targetElement) {
+            e.preventDefault(); // Prevent default browser context menu
+            contextMenu.style.left = e.clientX + 'px';
+            contextMenu.style.top = e.clientY + 'px';
+            contextMenu.style.display = 'block';
+            currentEditableElement = targetElement; // Store reference to the clicked element
+
+            // Hide context menu if clicked anywhere else
+            document.addEventListener('click', hideContextMenu);
+        }
+
+        function hideContextMenu() {
+            contextMenu.style.display = 'none';
+            document.removeEventListener('click', hideContextMenu);
+        }
+
+        // Add event listeners to all editable text wrappers
+        function addContextMenuListeners() {
+            document.querySelectorAll('.editable-text-wrapper').forEach(wrapper => {
+                wrapper.addEventListener('click', (e) => {
+                    if (e.target.tagName === 'SPAN') {
+                        showContextMenu(e, wrapper);
+                    }
+                });
+                wrapper.addEventListener('contextmenu', (e) => showContextMenu(e, wrapper));
+            });
+        }
+
+        // Handle Edit button in context menu
+        contextEditBtn.addEventListener('click', () => {
+            if (!currentEditableElement) return;
+
+            hideContextMenu();
+
+            const span = currentEditableElement.querySelector('span');
+            const fieldName = span.dataset.field;
+
+            let inputElement;
+            if (fieldName.includes('Address') || fieldName.includes('Note')) {
+                inputElement = document.createElement('textarea');
+                inputElement.rows = span.textContent.split('\n').length > 2 ? span.textContent.split('\n').length : 2;
+            } else if (fieldName.includes('Date')) {
+                inputElement = document.createElement('input');
+                inputElement.type = 'date';
+            } else if (fieldName.includes('Amount')) {
+                 inputElement = document.createElement('input');
+                 inputElement.type = 'number';
+                 inputElement.step = '0.01';
+            }
+            else {
+                inputElement = document.createElement('input');
+                inputElement.type = 'text';
+            }
+
+            inputElement.className = 'editable-input-active';
+
+            inputElement.value = span.innerHTML.replace(/<br>/g, '\n');
+            currentEditableElement.classList.add('editing');
+            currentEditableElement.appendChild(inputElement);
+            inputElement.focus();
+            currentInputField = inputElement;
+
+            inputElement.addEventListener('blur', () => saveEditedField(fieldName, inputElement.value, inputElement));
+            inputElement.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && inputElement.tagName !== 'TEXTAREA') {
+                    e.preventDefault();
+                    saveEditedField(fieldName, inputElement.value, inputElement);
+                }
+            });
+        });
+
+        // Save edited field function
+        function saveEditedField(fieldName, value, inputElement) {
+            if (fieldName.includes('Amount')) {
+                invoiceData[fieldName] = parseFloat(value) || 0;
+            } else {
+                invoiceData[fieldName] = value;
+            }
+
+            const span = currentEditableElement.querySelector('span');
+            span.innerHTML = value.replace(/\n/g, '<br>');
+
+            currentEditableElement.classList.remove('editing');
+            if (inputElement.parentNode === currentEditableElement) {
+                currentEditableElement.removeChild(inputElement);
+            }
+            currentInputField = null;
+
+            updateTotals();
+            saveInvoiceDataToLocalStorage();
+        }
+
+        // Handle Copy button in context menu
+        contextCopyBtn.addEventListener('click', () => {
+            if (!currentEditableElement) return;
+
+            hideContextMenu();
+            const textToCopy = currentEditableElement.querySelector('span').textContent;
+            try {
+                const tempTextArea = document.createElement('textarea');
+                tempTextArea.value = textToCopy;
+                document.body.appendChild(tempTextArea);
+                tempTextArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(tempTextArea);
+            } catch (err) {
+                console.error('Failed to copy text: ', err);
+            }
+        });
+
+
+        // Event Listeners
+        document.getElementById('showAddItemModalBtn').addEventListener('click', () => toggleModal('addItemModal', true));
+        document.getElementById('addItemConfirmBtn').addEventListener('click', () => {
+            const newItem = {
+                date: document.getElementById('modalDate').value,
+                subject: document.getElementById('modalSubject').value,
+                description: document.getElementById('modalDescription').value,
+                duration: parseFloat(document.getElementById('modalDuration').value),
+                rate: parseFloat(document.getElementById('modalRate').value)
+            };
+            if (newItem.date && newItem.subject && newItem.description && !isNaN(newItem.duration) && !isNaN(newItem.rate)) {
+                invoiceData.items.push(newItem);
+                toggleModal('addItemModal', false);
+                updateTotals();
+            } else {
+                // A custom modal alert would be better here instead of console.log
+                console.log('Please fill in all fields for the new invoice item.');
+            }
+        });
+
+        document.getElementById('exportPdfBtn').addEventListener('click', () => {
+            document.querySelectorAll('.editable-text-wrapper').forEach(wrapper => {
+                wrapper.classList.remove('editing');
+            });
+            document.querySelectorAll('#invoiceItems input').forEach(input => input.blur());
+
+            const element = document.getElementById('invoiceContent');
+            const opt = {
+                margin:       [10, 10, 10, 10],
+                filename:     'tutoring_invoice.pdf',
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  {
+                    scale: 4,
+                    logging: false,
+                    useCORS: true,
+                    letterRendering: true,
+                    allowTaint: true,
+                },
+                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+
+            html2pdf().from(element).set(opt).save().then(() => {
+                 if (currentEditableElement) {
+                     currentEditableElement.classList.add('editing');
+                     currentInputField && currentInputField.focus();
+                 }
+            });
+        });
+
+        // Initial load of invoice data when the DOM is ready
+        document.addEventListener('DOMContentLoaded', () => {
+            loadInvoiceDataFromLocalStorage();
+            addContextMenuListeners();
+        });
+
+    </script>
+</body>
+</html>
